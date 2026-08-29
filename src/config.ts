@@ -34,6 +34,12 @@ export function resolveConfig(
       "baseUrl must be an HTTP(S) URL without credentials or query parameters.",
     );
   }
+  const localHttpHost = new Set(["localhost", "127.0.0.1", "[::1]"]);
+  if (parsed.protocol === "http:" && !localHttpHost.has(parsed.hostname)) {
+    throw new ValidationError(
+      "Insecure HTTP baseUrl is allowed only for localhost development hosts.",
+    );
+  }
 
   const timeout = options.timeout ?? DEFAULT_TIMEOUT_MS;
   if (!Number.isFinite(timeout) || timeout <= 0) {

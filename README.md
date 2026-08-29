@@ -31,14 +31,14 @@ console.log(chart.planets, chart.ascendant, chart.aspects);
 
 ## Authentication and configuration
 
-Pass the server-side API credential as `apiKey`. It is sent only as an `Authorization: Bearer ...` header. The client does not log or persist credentials.
+Pass the server-side API credential as `apiKey`. It is sent only as an `Authorization: Bearer ...` header to the configured `baseUrl`. The client does not log or persist credentials. A custom injected `fetch` can observe the URL, headers, API key, and body because it is controlled by the caller; it is not a security boundary.
 
 ```ts
 const client = new GetBirthChart({
   ...(process.env.GETBIRTHCHART_API_KEY
     ? { apiKey: process.env.GETBIRTHCHART_API_KEY }
     : {}),
-  baseUrl: "https://api.getbirthchart.com", // override for staging/local
+  baseUrl: "https://api.getbirthchart.com", // HTTPS staging or localhost HTTP only
   timeout: 30_000,
 });
 ```

@@ -4,9 +4,12 @@
 
 Do not disclose exploitable security issues in a public GitHub issue.
 
-Use the official GetBirthChart security contact/process configured for the repository.
-
-Before public release, replace this section with the exact reporting destination.
+Report vulnerabilities privately through the repository's
+[GitHub Security Advisory form](https://github.com/getbirthchart-com/getbirthchart-js/security/advisories/new).
+Include the affected version, a concise reproduction, impact, and a suggested
+fix if available. Do not include live API keys or personal birth data in the
+report. If the form is unavailable, configure GitHub private vulnerability
+reporting before publishing the package; do not fall back to a public issue.
 
 ## SDK security principles
 

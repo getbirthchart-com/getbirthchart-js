@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ValidationError } from "../src/errors";
 import { GetBirthChart } from "../src/index";
 import { knownChart, synastryChart } from "./fixtures/charts";
 import { knownInput, mockFetch, unknownInput } from "./helpers";
@@ -16,6 +17,7 @@ describe("GetBirthChart client", () => {
     const [url, init] = fetch.mock.calls[0] ?? [];
     expect(url).toBe("https://staging.example.test/v1/charts/natal");
     expect(init?.method).toBe("POST");
+    expect(init?.redirect).toBe("error");
     expect(init?.headers).toEqual(
       expect.objectContaining({ Authorization: "Bearer gbc_test" }),
     );
@@ -30,6 +32,23 @@ describe("GetBirthChart client", () => {
     expect(chart.planets[0]?.planet).toBe("Sun");
     expect(chart.ascendant?.sign).toBe("Taurus");
     expect(chart.metadata.requestId).toBe("req-123");
+  });
+
+  it("allows localhost HTTP for development but rejects remote HTTP", () => {
+    expect(
+      () =>
+        new GetBirthChart({
+          baseUrl: "http://localhost:8000",
+          fetch: mockFetch(knownChart),
+        }),
+    ).not.toThrow();
+    expect(
+      () =>
+        new GetBirthChart({
+          baseUrl: "http://attacker.example",
+          fetch: mockFetch(knownChart),
+        }),
+    ).toThrow(ValidationError);
   });
 
   it("delegates sign, positions, aspects and Big Three to the natal API", async () => {

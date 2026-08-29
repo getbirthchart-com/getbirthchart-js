@@ -124,7 +124,12 @@ export class HttpClient {
     if (this.config.apiKey)
       headers.Authorization = `Bearer ${this.config.apiKey}`;
 
-    const init: RequestInit = { method, headers, signal: controller.signal };
+    const init: RequestInit = {
+      method,
+      headers,
+      signal: controller.signal,
+      redirect: "error",
+    };
     if (body !== undefined) init.body = JSON.stringify(body);
 
     try {
