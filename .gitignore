@@ -16,3 +16,11 @@ pnpm-debug.log*
 .vscode/
 .idea/
 *.tgz
+
+# Keep only project-facing Markdown files in the repository/package source.
+# Internal implementation/specification notes stay local.
+*.md
+!README.md
+!CHANGELOG.md
+!CONTRIBUTING.md
+!SECURITY.md
