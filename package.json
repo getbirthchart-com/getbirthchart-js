@@ -1,0 +1,66 @@
+{
+  "name": "@getbirthchart/sdk",
+  "version": "0.1.0",
+  "description": "Official TypeScript SDK for the GetBirthChart astrology calculation API.",
+  "type": "module",
+  "private": false,
+  "license": "MIT",
+  "homepage": "https://getbirthchart.com/developers",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/getbirthchart-com/getbirthchart-js.git"
+  },
+  "bugs": {
+    "url": "https://github.com/getbirthchart-com/getbirthchart-js/issues"
+  },
+  "keywords": [
+    "astrology",
+    "birth-chart",
+    "natal-chart",
+    "zodiac",
+    "ephemeris",
+    "synastry",
+    "typescript",
+    "sdk"
+  ],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "clean": "rm -rf dist coverage"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.35.0",
+    "@types/node": "^24.3.0",
+    "@vitest/coverage-v8": "^3.2.4",
+    "eslint": "^9.35.0",
+    "prettier": "^3.6.2",
+    "tsup": "^8.5.0",
+    "typescript": "^5.9.2",
+    "typescript-eslint": "^8.42.0",
+    "vitest": "^3.2.4"
+  }
+}
