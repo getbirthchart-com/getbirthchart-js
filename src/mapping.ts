@@ -1,12 +1,16 @@
 import { ApiError, BirthTimeRequiredError, ValidationError } from "./errors";
 import type {
+  AdditionalPoint,
   Aspect,
   AspectsResult,
+  CustomAspectRule,
   BirthChart,
   BigThreeResult,
   ChartMetadata,
   ChartUncertainty,
   ChartWarning,
+  CompositeResult,
+  DavisonResult,
   JsonObject,
   MoonSignResult,
   PlanetPlacement,
@@ -26,6 +30,19 @@ export interface NatalPayload {
   timezone: string;
   latitude: number;
   longitude: number;
+  altitude_m?: number;
+  house_system?: string;
+  node_type?: string;
+  aspect_preset?: string;
+  custom_aspect_rules?: Array<{
+    type: string;
+    exact_angle: number;
+    orb: number;
+  }>;
+  additional_points?: string[];
+  fold?: 0 | 1;
+  zodiac?: string;
+  ayanamsa?: string;
 }
 
 const ZODIAC_SIGNS = new Set<string>([
@@ -61,6 +78,18 @@ function asString(value: unknown, label: string): string {
   if (typeof value !== "string" || value.length === 0)
     throw invalidResponse(`${label} is missing or malformed.`);
   return value;
+}
+
+function compatibleSchemaVersion(value: unknown, label: string): string {
+  const version = asString(value, label);
+  const major = Number(version.split(".")[0]);
+  if (!Number.isInteger(major) || major !== 1) {
+    throw new ApiError(
+      `${label} major version ${version} is not supported by this SDK.`,
+      { code: "UNSUPPORTED_SCHEMA_VERSION" },
+    );
+  }
+  return version;
 }
 
 function asNumber(value: unknown, label: string): number {
@@ -155,12 +184,80 @@ function metadata(
     ...(typeof raw.aspectProfile === "string"
       ? { aspectProfile: raw.aspectProfile }
       : {}),
+    ...(typeof raw.aspectProfileVersion === "string"
+      ? { aspectProfileVersion: raw.aspectProfileVersion }
+      : {}),
+    ...(typeof raw.aspectPreset === "string"
+      ? { aspectPreset: raw.aspectPreset }
+      : {}),
+    ...(Array.isArray(raw.customAspectRules)
+      ? {
+          customAspectRules: raw.customAspectRules.flatMap((item) => {
+            if (!isRecord(item)) return [];
+            if (
+              typeof item.type !== "string" ||
+              typeof item.exactAngle !== "number" ||
+              typeof item.orb !== "number"
+            )
+              return [];
+            return [
+              {
+                type: item.type,
+                exactAngle: item.exactAngle,
+                orb: item.orb,
+              } satisfies CustomAspectRule,
+            ];
+          }),
+        }
+      : {}),
     ...(typeof raw.zodiac === "string" ? { zodiac: raw.zodiac } : {}),
+    ...(typeof raw.nodeType === "string" ? { nodeType: raw.nodeType } : {}),
+    ...(Array.isArray(raw.additionalPoints)
+      ? {
+          additionalPoints: raw.additionalPoints.filter(
+            (item): item is AdditionalPoint => typeof item === "string",
+          ),
+        }
+      : {}),
     ...(typeof raw.ayanamsa === "string" ? { ayanamsa: raw.ayanamsa } : {}),
+    ...(typeof raw.ayanamsha === "string" ? { ayanamsha: raw.ayanamsha } : {}),
+    ...(typeof raw.ayanamsaVersion === "string"
+      ? { ayanamsaVersion: raw.ayanamsaVersion }
+      : {}),
+    ...(typeof raw.ayanamsaDegrees === "number"
+      ? { ayanamsaDegrees: raw.ayanamsaDegrees }
+      : {}),
+    ...(typeof raw.requestedHouseSystem === "string"
+      ? { requestedHouseSystem: raw.requestedHouseSystem }
+      : {}),
+    ...(typeof raw.houseAlgorithmVersion === "string"
+      ? { houseAlgorithmVersion: raw.houseAlgorithmVersion }
+      : {}),
+    ...(typeof raw.pointProfile === "string"
+      ? { pointProfile: raw.pointProfile }
+      : {}),
+    ...(typeof raw.pointProfileVersion === "string"
+      ? { pointProfileVersion: raw.pointProfileVersion }
+      : {}),
+    ...(typeof raw.rulershipProfile === "string"
+      ? { rulershipProfile: raw.rulershipProfile }
+      : {}),
+    ...(typeof raw.rulershipProfileVersion === "string"
+      ? { rulershipProfileVersion: raw.rulershipProfileVersion }
+      : {}),
+    ...(typeof raw.dominantProfile === "string"
+      ? { dominantProfile: raw.dominantProfile }
+      : {}),
+    ...(typeof raw.dominantProfileVersion === "string"
+      ? { dominantProfileVersion: raw.dominantProfileVersion }
+      : {}),
     ...(typeof raw.apiVersion === "string"
       ? { apiVersion: raw.apiVersion }
       : {}),
     ...(typeof schemaVersion === "string" ? { schemaVersion } : {}),
+    ...(typeof raw.calculationHash === "string"
+      ? { calculationHash: raw.calculationHash }
+      : {}),
     ...(requestId ? { requestId } : {}),
     ...(rawJson ? { raw: rawJson } : {}),
   };
@@ -269,6 +366,84 @@ function mapHouse(
   };
 }
 
+function mapDerivedPoint(value: unknown, label: string) {
+  const raw = asObject(value, label);
+  const alternativeLongitude = optionalNumber(
+    raw.alternativeLongitude,
+    `${label}.alternativeLongitude`,
+  );
+  const house = optionalNumber(raw.house, `${label}.house`);
+  const rawJson = asJsonObject(raw);
+  return {
+    longitude: asNumber(raw.longitude, `${label}.longitude`),
+    sign: zodiacSign(raw.sign, `${label}.sign`),
+    degree: asNumber(raw.degreeInSign, `${label}.degreeInSign`),
+    method: asString(raw.method, `${label}.method`),
+    requiresBirthTime:
+      typeof raw.requiresBirthTime === "boolean"
+        ? raw.requiresBirthTime
+        : (() => {
+            throw invalidResponse(`${label}.requiresBirthTime is malformed.`);
+          })(),
+    ...(house !== undefined ? { house } : {}),
+    ...(alternativeLongitude !== undefined ? { alternativeLongitude } : {}),
+    ...(rawJson ? { raw: rawJson } : {}),
+  };
+}
+
+function mapUnknownTimeAssessment(value: unknown) {
+  const raw = asObject(value, "unknownTimeAssessment");
+  const rawJson = asJsonObject(raw);
+  const interval = asJsonObject(raw.interval);
+  const bodies = isRecord(raw.bodies)
+    ? Object.fromEntries(
+        Object.entries(raw.bodies).flatMap(([key, item]) => {
+          const json = asJsonObject(item);
+          return json ? [[key, json]] : [];
+        }),
+      )
+    : undefined;
+  const aspects = isRecord(raw.aspects)
+    ? Object.fromEntries(
+        Object.entries(raw.aspects).flatMap(([key, item]) => {
+          const json = asJsonObject(item);
+          return json ? [[key, json]] : [];
+        }),
+      )
+    : undefined;
+  const unavailable = Array.isArray(raw.unavailable)
+    ? raw.unavailable.filter((item): item is string => typeof item === "string")
+    : [];
+  if (
+    unavailable.length !==
+    (Array.isArray(raw.unavailable) ? raw.unavailable.length : 0)
+  )
+    throw invalidResponse("unknownTimeAssessment.unavailable is malformed.");
+  const provenance = asJsonObject(raw.provenance);
+  return {
+    version: asString(raw.version, "unknownTimeAssessment.version"),
+    algorithmVersion: asString(
+      raw.algorithmVersion,
+      "unknownTimeAssessment.algorithmVersion",
+    ),
+    anchor: asString(raw.anchor, "unknownTimeAssessment.anchor"),
+    assessmentComplete:
+      typeof raw.assessmentComplete === "boolean"
+        ? raw.assessmentComplete
+        : (() => {
+            throw invalidResponse(
+              "unknownTimeAssessment.assessmentComplete is malformed.",
+            );
+          })(),
+    ...(interval ? { interval } : {}),
+    ...(bodies ? { bodies } : {}),
+    ...(aspects ? { aspects } : {}),
+    unavailable,
+    ...(provenance ? { provenance } : {}),
+    ...(rawJson ? { raw: rawJson } : {}),
+  };
+}
+
 export function toNatalPayload(input: BirthDataInput): NatalPayload {
   if (
     !/^\d{4}-\d{2}-\d{2}$/.test(input.date) ||
@@ -329,8 +504,82 @@ export function toNatalPayload(input: BirthDataInput): NatalPayload {
   if (input.place !== undefined && input.place.trim() === "") {
     throw new ValidationError("place must not be empty when provided.");
   }
+  if (
+    input.altitudeM !== undefined &&
+    (!Number.isFinite(input.altitudeM) ||
+      input.altitudeM < -500 ||
+      input.altitudeM > 10000)
+  ) {
+    throw new ValidationError(
+      "altitudeM must be between -500 and 10000 metres.",
+    );
+  }
+  const houseSystems = new Set([
+    "placidus",
+    "koch",
+    "porphyry",
+    "campanus",
+    "regiomontanus",
+    "alcabitius",
+    "topocentric",
+    "morinus",
+    "meridian",
+    "whole_sign",
+    "equal",
+  ]);
+  if (input.houseSystem !== undefined && !houseSystems.has(input.houseSystem))
+    throw new ValidationError("houseSystem is not supported by the API.");
+  if (
+    input.nodeType !== undefined &&
+    !["true", "mean"].includes(input.nodeType)
+  )
+    throw new ValidationError("nodeType must be 'true' or 'mean'.");
+  if (
+    input.aspectPreset !== undefined &&
+    !["standard", "extended", "custom", "modern-major-v1"].includes(
+      input.aspectPreset,
+    )
+  )
+    throw new ValidationError("aspectPreset is not supported by the API.");
+  if (input.aspectPreset === "custom" && !input.customAspectRules?.length)
+    throw new ValidationError(
+      "customAspectRules are required when aspectPreset is 'custom'.",
+    );
+  if (input.customAspectRules && input.aspectPreset !== "custom")
+    throw new ValidationError(
+      "customAspectRules are only valid when aspectPreset is 'custom'.",
+    );
+  if (input.customAspectRules) {
+    for (const rule of input.customAspectRules) {
+      if (
+        !rule.type.trim() ||
+        !Number.isFinite(rule.exactAngle) ||
+        rule.exactAngle < 0 ||
+        rule.exactAngle > 180 ||
+        !Number.isFinite(rule.orb) ||
+        rule.orb < 0 ||
+        rule.orb > 15
+      )
+        throw new ValidationError("customAspectRules contain an invalid rule.");
+    }
+  }
+  if (input.fold !== undefined && input.fold !== 0 && input.fold !== 1)
+    throw new ValidationError("fold must be 0 or 1.");
+  if (
+    input.zodiac !== undefined &&
+    !["tropical", "sidereal"].includes(input.zodiac)
+  )
+    throw new ValidationError("zodiac must be 'tropical' or 'sidereal'.");
+  if (input.zodiac === "sidereal" && input.ayanamsa === undefined)
+    throw new ValidationError(
+      "ayanamsa is required when zodiac is 'sidereal'.",
+    );
+  if (input.zodiac !== "sidereal" && input.ayanamsa !== undefined)
+    throw new ValidationError(
+      "ayanamsa is only meaningful with sidereal zodiac.",
+    );
 
-  return {
+  const payload: NatalPayload = {
     local_date: input.date,
     local_time: unknownTime ? null : (input.time ?? null),
     unknown_time: unknownTime,
@@ -338,6 +587,24 @@ export function toNatalPayload(input: BirthDataInput): NatalPayload {
     latitude,
     longitude,
   };
+  if (input.altitudeM !== undefined) payload.altitude_m = input.altitudeM;
+  if (input.houseSystem !== undefined) payload.house_system = input.houseSystem;
+  if (input.nodeType !== undefined) payload.node_type = input.nodeType;
+  if (input.aspectPreset !== undefined)
+    payload.aspect_preset = input.aspectPreset;
+  if (input.customAspectRules !== undefined) {
+    payload.custom_aspect_rules = input.customAspectRules.map((rule) => ({
+      type: rule.type,
+      exact_angle: rule.exactAngle,
+      orb: rule.orb,
+    }));
+  }
+  if (input.additionalPoints !== undefined)
+    payload.additional_points = [...input.additionalPoints];
+  if (input.fold !== undefined) payload.fold = input.fold;
+  if (input.zodiac !== undefined) payload.zodiac = input.zodiac;
+  if (input.ayanamsa !== undefined) payload.ayanamsa = input.ayanamsa;
+  return payload;
 }
 
 export function mapBirthChart(value: unknown, requestId?: string): BirthChart {
@@ -361,7 +628,11 @@ export function mapBirthChart(value: unknown, requestId?: string): BirthChart {
     throw invalidResponse("derived is missing or malformed.");
   if (!Array.isArray(root.aspects))
     throw invalidResponse("aspects is missing or malformed.");
-  const chartMetadata = metadata(root.meta, root.schemaVersion, requestId);
+  const schemaVersion = compatibleSchemaVersion(
+    root.schemaVersion,
+    "schemaVersion",
+  );
+  const chartMetadata = metadata(root.meta, schemaVersion, requestId);
   const chartUncertainty = uncertainty(birthTimeKnown, warnings);
   const result: BirthChart = {
     planets,
@@ -376,6 +647,21 @@ export function mapBirthChart(value: unknown, requestId?: string): BirthChart {
       result.ascendant = mapAscendant(rawAngles.ascendant);
     result.houses = rawHouses.map((item, index) => mapHouse(item, index));
   }
+  if (isRecord(root.points)) {
+    result.points = Object.fromEntries(
+      Object.entries(root.points).map(([name, point]) => [
+        name,
+        mapDerivedPoint(point, `points.${name}`),
+      ]),
+    );
+  }
+  result.derived = root.derived as import("./types").JsonObject;
+  if (isRecord(root.unknownTimeAssessment))
+    result.unknownTimeAssessment = mapUnknownTimeAssessment(
+      root.unknownTimeAssessment,
+    );
+  const rawJson = asJsonObject(root);
+  if (rawJson) result.raw = rawJson;
   return result;
 }
 
@@ -500,8 +786,13 @@ function summary(chart: BirthChart) {
     planets: chart.planets,
     ...(chart.ascendant ? { ascendant: chart.ascendant } : {}),
     ...(chart.houses ? { houses: chart.houses } : {}),
+    ...(chart.points ? { points: chart.points } : {}),
     birthTimeKnown: chart.birthTimeKnown,
     metadata: chart.metadata,
+    ...(chart.uncertainty ? { uncertainty: chart.uncertainty } : {}),
+    ...(chart.unknownTimeAssessment
+      ? { unknownTimeAssessment: chart.unknownTimeAssessment }
+      : {}),
   };
 }
 
@@ -519,7 +810,7 @@ export function mapSynastry(
   );
   const rootMetadata = metadata(
     root.meta,
-    root.schemaVersion,
+    compatibleSchemaVersion(root.schemaVersion, "synastry.schemaVersion"),
     requestId,
     chartA.metadata,
   );
@@ -528,6 +819,7 @@ export function mapSynastry(
     ...(chartB.uncertainty?.reasons ?? []),
   ];
   const result: SynastryResult = {
+    schemaVersion: rootMetadata.schemaVersion ?? "1.0.0",
     aspects,
     personA: summary(chartA),
     personB: summary(chartB),
@@ -555,9 +847,101 @@ export function mapSynastry(
 export function synastryPayload(input: SynastryInput): {
   chart_a: NatalPayload;
   chart_b: NatalPayload;
+  relationship_type?: string;
+  topic?: string;
+  node_type?: string;
+  target_instant?: string;
 } {
-  return {
+  const payload: {
+    chart_a: NatalPayload;
+    chart_b: NatalPayload;
+    relationship_type?: string;
+    topic?: string;
+    node_type?: string;
+    target_instant?: string;
+  } = {
     chart_a: toNatalPayload(input.personA),
     chart_b: toNatalPayload(input.personB),
   };
+  if (input.relationshipType !== undefined)
+    payload.relationship_type = input.relationshipType;
+  if (input.topic !== undefined) payload.topic = input.topic;
+  if (input.nodeType !== undefined) payload.node_type = input.nodeType;
+  if (input.targetInstant !== undefined)
+    payload.target_instant = input.targetInstant;
+  return payload;
+}
+
+export function mapComposite(
+  value: unknown,
+  requestId?: string,
+): CompositeResult {
+  const root = asObject(value, "composite");
+  const schemaVersion = compatibleSchemaVersion(
+    root.schemaVersion,
+    "composite.schemaVersion",
+  );
+  const bodyObject = asObject(root.bodies, "composite.bodies");
+  const rawAngles = asObject(root.angles, "composite.angles");
+  const rawHouses = root.houses;
+  if (!Array.isArray(rawHouses))
+    throw invalidResponse("composite.houses is malformed.");
+  if (!Array.isArray(root.aspects))
+    throw invalidResponse("composite.aspects is malformed.");
+  if (!Array.isArray(root.midpoints))
+    throw invalidResponse("composite.midpoints is malformed.");
+  const chartMetadata = metadata(root.meta, schemaVersion, requestId);
+  const raw = asJsonObject(root);
+  if (!raw) throw invalidResponse("composite response is malformed.");
+  const result: CompositeResult = {
+    schemaVersion,
+    metadata: chartMetadata,
+    planets: Object.entries(bodyObject).map(([name, body]) =>
+      mapPlanet(body, name),
+    ),
+    aspects: root.aspects.map((item, index) => mapAspect(item, index)),
+    houses: rawHouses.map((item, index) => mapHouse(item, index)),
+    midpoints: root.midpoints.flatMap((item) => {
+      const json = asJsonObject(item);
+      return json ? [json] : [];
+    }),
+    ...(rawAngles.ascendant !== undefined
+      ? { ascendant: mapAscendant(rawAngles.ascendant) }
+      : {}),
+    raw,
+  };
+  const rawWarnings = root.warnings;
+  if (Array.isArray(rawWarnings) && rawWarnings.length > 0)
+    result.warnings = rawWarnings.map((item, index) => warning(item, index));
+  return result;
+}
+
+export function mapDavison(value: unknown, requestId?: string): DavisonResult {
+  const root = asObject(value, "davison");
+  const schemaVersion = compatibleSchemaVersion(
+    root.schemaVersion,
+    "davison.schemaVersion",
+  );
+  const chart = mapBirthChart(root.chart, requestId);
+  const derivedFrom = asJsonObject(root.derivedFrom);
+  if (!derivedFrom) throw invalidResponse("davison.derivedFrom is malformed.");
+  const rootMetadata = metadata(
+    root.meta,
+    schemaVersion,
+    requestId,
+    chart.metadata,
+  );
+  const raw = asJsonObject(root);
+  if (!raw) throw invalidResponse("davison response is malformed.");
+  const result: DavisonResult = {
+    schemaVersion,
+    metadata: rootMetadata,
+    chart,
+    derivedFrom,
+    raw,
+  };
+  const rawWarnings = root.warnings;
+  if (Array.isArray(rawWarnings) && rawWarnings.length > 0)
+    result.warnings = rawWarnings.map((item, index) => warning(item, index));
+  return result;
 }

@@ -5,6 +5,8 @@ import {
   mapAspects,
   mapBigThree,
   mapBirthChart,
+  mapComposite,
+  mapDavison,
   mapMoonSign,
   mapPlanetPositions,
   mapRisingSign,
@@ -18,6 +20,8 @@ import type {
   BirthChart,
   BigThreeResult,
   BirthDataInput,
+  CompositeResult,
+  DavisonResult,
   GetBirthChartOptions,
   MoonSignResult,
   PlanetPositionsResult,
@@ -77,5 +81,23 @@ export class GetBirthChart {
       synastryPayload(input),
     );
     return mapSynastry(result.data, result.requestId);
+  }
+
+  async calculateComposite(input: SynastryInput): Promise<CompositeResult> {
+    const result = await this.http.request<unknown>(
+      "POST",
+      "/v1/charts/composite",
+      synastryPayload(input),
+    );
+    return mapComposite(result.data, result.requestId);
+  }
+
+  async calculateDavison(input: SynastryInput): Promise<DavisonResult> {
+    const result = await this.http.request<unknown>(
+      "POST",
+      "/v1/charts/davison",
+      synastryPayload(input),
+    );
+    return mapDavison(result.data, result.requestId);
   }
 }

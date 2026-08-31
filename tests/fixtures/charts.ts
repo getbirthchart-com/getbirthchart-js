@@ -136,3 +136,20 @@ export const synastryChart = {
   directionalThemes: [],
   warnings: [],
 } as const;
+
+export const compositeChart = {
+  ...knownChart,
+  schemaVersion: "1.3.0",
+  midpoints: [],
+} as const;
+
+export const davisonChart = {
+  schemaVersion: "1.1.0",
+  meta: knownChart.meta,
+  chart: knownChart,
+  derivedFrom: {
+    utcDateTime: "1990-01-15T17:00:00Z",
+    latitude: 40.7128,
+    longitude: -74.006,
+  },
+} as const;

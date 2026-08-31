@@ -29,6 +29,17 @@ const chart = await client.calculateBirthChart({
 console.log(chart.planets, chart.ascendant, chart.aspects);
 ```
 
+The request maps directly to the `gbc-astro` 1.13.0 HTTP contract. Omit the
+calculation options to retain the legacy defaults:
+
+`Tropical · Placidus · True Node · Standard · Chiron on · Lilith off`
+
+When needed, `BirthDataInput` supports the public API options for `houseSystem`,
+`nodeType`, `aspectPreset`, `customAspectRules`, `additionalPoints`, `zodiac`,
+`ayanamsa`, `fold`, and `altitudeM`. Sidereal requests require an ayanamsa;
+Lahiri is the recommended product choice. Custom aspects require rules using
+`exactAngle` and `orb` in degrees.
+
 ## Authentication and configuration
 
 Pass the server-side API credential as `apiKey`. It is sent only as an `Authorization: Bearer ...` header to the configured `baseUrl`. The client does not log or persist credentials. A custom injected `fetch` can observe the URL, headers, API key, and body because it is controlled by the caller; it is not a security boundary.
@@ -73,11 +84,21 @@ const moon = await client.getMoonSign(input);
 const rising = await client.getRisingSign(input);
 const aspects = await client.calculateAspects(input);
 const synastry = await client.calculateSynastry({ personA: input, personB: otherInput });
+const composite = await client.calculateComposite({ personA: input, personB: otherInput });
+const davison = await client.calculateDavison({ personA: input, personB: otherInput });
 ```
 
-The v0.1 client exposes exactly these eight methods:
+The client exposes these methods:
 
-`calculateBirthChart`, `getPlanetPositions`, `getSunSign`, `getMoonSign`, `getRisingSign`, `getBigThree`, `calculateAspects`, and `calculateSynastry`.
+`calculateBirthChart`, `getPlanetPositions`, `getSunSign`, `getMoonSign`,
+`getRisingSign`, `getBigThree`, `calculateAspects`, `calculateSynastry`,
+`calculateComposite`, and `calculateDavison`.
+
+The response types expose natal schema `1.9.0`, synastry schema `1.5.0`,
+composite schema `1.3.0`, and Davison schema `1.1.0`. Compatible additive
+fields are preserved in `raw`; an incompatible major schema fails closed.
+HTTP natal responses may omit `calculationHash`. The SDK does not require it,
+and preserves it without truncation when the server returns it.
 
 ## Errors
 
@@ -103,12 +124,15 @@ Exported error types include `AuthenticationError`, `RateLimitError`, `Validatio
 
 The package is ESM-first, ships declaration files, uses native `fetch`, targets Node.js 20+, and has no runtime dependencies. A custom `fetch` implementation can be injected for tests or non-Node runtimes.
 
-See [API_CONTRACT.md](./API_CONTRACT.md), [IMPLEMENTATION_SPEC.md](./IMPLEMENTATION_SPEC.md), and [API_AUDIT.md](./API_AUDIT.md).
+The types are handwritten at the response boundary and are validated against
+the published OpenAPI contract from the core `v1.13.0` tag. The contract source
+is [the core API model](https://github.com/getbirthchart-com/gbc-astro-engine/blob/v1.13.0/src/gbc_astro/api/models.py).
 
 - Website: https://getbirthchart.com/
 - Developer documentation: https://getbirthchart.com/developers
 - Methodology: https://getbirthchart.com/methodology
 - Repository: https://github.com/getbirthchart-com/getbirthchart-js
+- Core contract tag: https://github.com/getbirthchart-com/gbc-astro-engine/tree/v1.13.0
 - Security: [SECURITY.md](./SECURITY.md)
 
 ## License

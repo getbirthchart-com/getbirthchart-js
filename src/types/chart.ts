@@ -1,7 +1,22 @@
-import type { ChartMetadata, ZodiacSign } from "./common";
+import type { ChartMetadata, JsonObject, ZodiacSign } from "./common";
 import type { Aspect } from "./aspects";
 import type { PlanetPlacement } from "./planets";
-import type { ChartUncertainty, MoonUncertainty } from "./uncertainty";
+import type {
+  ChartUncertainty,
+  MoonUncertainty,
+  UnknownTimeAssessment,
+} from "./uncertainty";
+
+export interface DerivedPoint {
+  longitude: number;
+  sign: ZodiacSign;
+  degree: number;
+  method: string;
+  requiresBirthTime: boolean;
+  house?: number;
+  alternativeLongitude?: number;
+  raw?: JsonObject;
+}
 
 export interface Ascendant {
   sign: ZodiacSign;
@@ -25,6 +40,11 @@ export interface BirthChart {
   uncertainty?: ChartUncertainty;
   metadata: ChartMetadata;
   warnings?: import("./uncertainty").ChartWarning[];
+  points?: Record<string, DerivedPoint>;
+  derived?: JsonObject;
+  unknownTimeAssessment?: UnknownTimeAssessment;
+  /** Preserves additive response fields without weakening mapped guarantees. */
+  raw?: JsonObject;
 }
 
 export interface SignResult {

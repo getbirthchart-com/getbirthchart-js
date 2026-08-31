@@ -1,7 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { ValidationError } from "../src/errors";
 import { GetBirthChart } from "../src/index";
-import { knownChart, synastryChart } from "./fixtures/charts";
+import {
+  compositeChart,
+  davisonChart,
+  knownChart,
+  synastryChart,
+} from "./fixtures/charts";
 import { knownInput, mockFetch, unknownInput } from "./helpers";
 
 describe("GetBirthChart client", () => {
@@ -86,5 +91,97 @@ describe("GetBirthChart client", () => {
       phase: "indeterminate",
     });
     expect(result.personB?.ascendant).toBeUndefined();
+  });
+
+  it("sends v1.13 calculation options without changing the legacy default payload", async () => {
+    const fetch = mockFetch(knownChart);
+    const client = new GetBirthChart({ fetch });
+    await client.calculateBirthChart({
+      ...knownInput,
+      altitudeM: 12,
+      houseSystem: "whole_sign",
+      nodeType: "mean",
+      aspectPreset: "custom",
+      customAspectRules: [
+        { type: "conjunction", exactAngle: 0, orb: 10 },
+        { type: "square", exactAngle: 90, orb: 6 },
+      ],
+      additionalPoints: ["mean_lilith", "vertex"],
+      fold: 1,
+      zodiac: "sidereal",
+      ayanamsa: "lahiri",
+    });
+    const body = JSON.parse(String(fetch.mock.calls[0]?.[1]?.body));
+    expect(body).toEqual({
+      local_date: "1990-01-15",
+      local_time: "12:00",
+      unknown_time: false,
+      timezone: "America/New_York",
+      latitude: 40.7128,
+      longitude: -74.006,
+      altitude_m: 12,
+      house_system: "whole_sign",
+      node_type: "mean",
+      aspect_preset: "custom",
+      custom_aspect_rules: [
+        { type: "conjunction", exact_angle: 0, orb: 10 },
+        { type: "square", exact_angle: 90, orb: 6 },
+      ],
+      additional_points: ["mean_lilith", "vertex"],
+      fold: 1,
+      zodiac: "sidereal",
+      ayanamsa: "lahiri",
+    });
+  });
+
+  it("maps composite and Davison schema-versioned responses", async () => {
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(compositeChart), {
+          headers: { "Content-Type": "application/json" },
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(davisonChart), {
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+    const client = new GetBirthChart({ fetch });
+    const composite = await client.calculateComposite({
+      personA: knownInput,
+      personB: knownInput,
+    });
+    const davison = await client.calculateDavison({
+      personA: knownInput,
+      personB: knownInput,
+    });
+    expect(composite.schemaVersion).toBe("1.3.0");
+    expect(davison.schemaVersion).toBe("1.1.0");
+    expect(davison.chart.birthTimeKnown).toBe(true);
+  });
+
+  it("rejects invalid option combinations before making a request", async () => {
+    const fetch = mockFetch(knownChart);
+    const client = new GetBirthChart({ fetch });
+    await expect(
+      client.calculateBirthChart({
+        ...knownInput,
+        aspectPreset: "custom",
+      }),
+    ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+    await expect(
+      client.calculateBirthChart({
+        ...knownInput,
+        zodiac: "sidereal",
+      }),
+    ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+    await expect(
+      client.calculateBirthChart({
+        ...knownInput,
+        customAspectRules: [{ type: "square", exactAngle: 90, orb: 6 }],
+      }),
+    ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+    expect(fetch).not.toHaveBeenCalled();
   });
 });

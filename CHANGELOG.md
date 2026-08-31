@@ -10,6 +10,20 @@ The project follows Semantic Versioning.
 
 - Initial repository and SDK specification.
 
+## [0.2.0] - 2026-08-31
+
+### Added
+
+- `gbc-astro` 1.13.0 calculation options for house systems, node convention,
+  aspect presets/custom rules, additional points, sidereal zodiac/ayanamsa,
+  altitude, and PEP 495 fold.
+- Schema-aware natal, synastry, composite, and Davison response types.
+- `calculateComposite()` and `calculateDavison()` methods.
+- Unknown-time assessment, derived points, requested/effective metadata, and
+  additive response-field preservation.
+- Fail-closed handling for incompatible response schema major versions.
+- Full-length calculation hash preservation when returned by HTTP.
+
 ## [0.1.0] - 2026-08-29
 
 ### Added

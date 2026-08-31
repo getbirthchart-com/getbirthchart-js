@@ -24,3 +24,17 @@ export interface MoonUncertainty {
   };
   reason?: string;
 }
+
+export interface UnknownTimeAssessment {
+  version: string;
+  algorithmVersion: string;
+  anchor: string;
+  assessmentComplete: boolean;
+  interval?: JsonObject;
+  bodies?: Record<string, JsonObject>;
+  aspects?: Record<string, JsonObject>;
+  unavailable: string[];
+  provenance?: JsonObject;
+  /** Preserves additive assessment fields from a compatible schema 1.x response. */
+  raw?: JsonObject;
+}
